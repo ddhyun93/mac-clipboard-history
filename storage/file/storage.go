@@ -2,11 +2,12 @@ package file
 
 import (
 	"errors"
-	bubblelist "github.com/charmbracelet/bubbles/list"
 	"io"
 	"myclipboard/tui"
 	"os"
 	"strings"
+
+	bubblelist "github.com/charmbracelet/bubbles/list"
 )
 
 type Storage struct {
@@ -38,7 +39,8 @@ func (s *Storage) Load(maxLength int) (err error) {
 		container = make([]tui.Item, s.maxLength)
 	}
 	for idx, d := range data {
-		container[idx] = tui.Item(d)
+		item := tui.Item{Display: tui.Displayed(d), Value: d}
+		container[idx] = item
 	}
 	s.container = container
 	s.ClipboardSig = make(chan struct{})
@@ -47,7 +49,7 @@ func (s *Storage) Load(maxLength int) (err error) {
 
 func (s *Storage) Write(text string) (err error) {
 	s.container = s.container[:s.maxLength+1]
-	s.container = append([]tui.Item{tui.Item(text)}, s.container[0:19]...)
+	s.container = append([]tui.Item{tui.Item{Value: text, Display: tui.Displayed(text)}}, s.container[0:19]...)
 	return
 }
 
@@ -70,16 +72,24 @@ func (s *Storage) Read(idx int) (data string, err error) {
 		return
 	}
 	if idx+1 > s.maxLength {
-		err = errors.New("index exceed max legnth of container")
+		err = errors.New("index exceed max length of container")
 		return
 	}
 
-	data = string(s.container[idx])
+	data = s.container[idx].Value
 	return
 }
 
 func (s *Storage) ToBubbleList() (ret []bubblelist.Item) {
 	for _, item := range s.container {
+		if len([]rune(item.Display)) > 80 {
+			item.Display = tui.Displayed([]rune(item.Display)[:80])
+		}
+
+		if strings.Contains(string(item.Display), "\n") {
+			item.Display = tui.Displayed(strings.Split(string(item.Display), "\n")[0]+"\\n"+strings.Split(string(item.Display), "\n")[1]) + "..."
+		}
+
 		ret = append(ret, item)
 	}
 	return
@@ -87,7 +97,7 @@ func (s *Storage) ToBubbleList() (ret []bubblelist.Item) {
 
 func (s *Storage) containerToStringSlice() (ret []string) {
 	for _, item := range s.container {
-		ret = append(ret, string(item))
+		ret = append(ret, string(item.Display))
 	}
 	return
 }

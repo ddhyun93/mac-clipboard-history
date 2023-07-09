@@ -2,9 +2,10 @@ package clipboard
 
 import (
 	"context"
-	"golang.design/x/clipboard"
 	"myclipboard/storage/file"
 	"time"
+
+	"golang.design/x/clipboard"
 )
 
 func InitClipboard(container *file.Storage) {
