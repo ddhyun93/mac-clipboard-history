@@ -2,12 +2,11 @@ package file
 
 import (
 	"errors"
+	bubblelist "github.com/charmbracelet/bubbles/list"
 	"io"
 	"myclipboard/tui"
 	"os"
 	"strings"
-
-	bubblelist "github.com/charmbracelet/bubbles/list"
 )
 
 type Storage struct {
@@ -34,7 +33,7 @@ func (s *Storage) Load(maxLength int) (err error) {
 		return
 	}
 
-	data := strings.Split(string(content), "\n")
+	data := strings.Split(string(content), "[#line-splitter#]")
 	if len(data) == 0 {
 		container = make([]tui.Item, s.maxLength)
 	}
@@ -49,7 +48,7 @@ func (s *Storage) Load(maxLength int) (err error) {
 
 func (s *Storage) Write(text string) (err error) {
 	s.container = s.container[:s.maxLength+1]
-	s.container = append([]tui.Item{tui.Item{Value: text, Display: tui.Displayed(text)}}, s.container[0:19]...)
+	s.container = append([]tui.Item{{Value: text, Display: tui.Displayed(text)}}, s.container[0:19]...)
 	return
 }
 
@@ -82,12 +81,18 @@ func (s *Storage) Read(idx int) (data string, err error) {
 
 func (s *Storage) ToBubbleList() (ret []bubblelist.Item) {
 	for _, item := range s.container {
-		if len([]rune(item.Display)) > 80 {
-			item.Display = tui.Displayed([]rune(item.Display)[:80])
+		if strings.Contains(string(item.Display), "\n") {
+			strLines := strings.Split(string(item.Display), "\n")
+			fullStr := ""
+			for _, line := range strLines {
+				fullStr += line + "\\n"
+			}
+			fullStr = strings.TrimRight(fullStr, "\\n")
+			item.Display = tui.Displayed(fullStr)
 		}
 
-		if strings.Contains(string(item.Display), "\n") {
-			item.Display = tui.Displayed(strings.Split(string(item.Display), "\n")[0]+"\\n"+strings.Split(string(item.Display), "\n")[1]) + "..."
+		if len([]rune(item.Display)) > 100 {
+			item.Display = tui.Displayed([]rune(item.Display)[:100])
 		}
 
 		ret = append(ret, item)
@@ -97,13 +102,15 @@ func (s *Storage) ToBubbleList() (ret []bubblelist.Item) {
 
 func (s *Storage) containerToStringSlice() (ret []string) {
 	for _, item := range s.container {
-		ret = append(ret, string(item.Display))
+		if item.Value != "" {
+			ret = append(ret, item.Value)
+		}
 	}
 	return
 }
 
 func (s *Storage) Close() error {
-	content := strings.Join(s.containerToStringSlice(), "\n")
+	content := strings.Join(s.containerToStringSlice(), "[#line-splitter#]")
 	// initialize file
 	if err := s.file.Truncate(0); err != nil {
 		return err
